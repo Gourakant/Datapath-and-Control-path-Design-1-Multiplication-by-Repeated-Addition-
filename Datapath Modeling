@@ -1,0 +1,54 @@
+module MUL_datapath (eqz, ldA, ldB, ldP, clrP, decB, data_in, clk);
+    input        ldA, ldB, ldP, clrP, decB, clk;
+    output       eqz;
+    input [15:0] data_in;
+
+    wire [15:0] Aout, Pout, Bout, sum, bus;
+
+    // FIX 1: data_in must drive the internal bus
+    assign bus = data_in;
+
+    PIPO1 A    (Aout, bus,  ldA, clk);
+    PIPO2 P    (Pout, sum,  ldP, clrP, clk);
+    CNTR  B    (Bout, bus,  ldB, decB, clk);
+    ADD   AD   (sum,  Aout, Pout);
+    EQZ   COMP (eqz,  Bout);
+endmodule
+
+
+// ── PIPO1: Register A (multiplicand) ─────────────────────────
+module PIPO1 (dout, din, ld, clk);
+    input [15:0] din;  input ld, clk;
+    output reg [15:0] dout;
+    always @(posedge clk) if (ld) dout <= din;
+endmodule
+
+// ── PIPO2: Register P (accumulator), sync clear, clr > ld ────
+module PIPO2 (dout, din, ld, clr, clk);
+    input [15:0] din;  input ld, clr, clk;
+    output reg [15:0] dout;
+    always @(posedge clk)
+        if      (clr) dout <= 16'b0;
+        else if (ld)  dout <= din;
+endmodule
+
+// ── CNTR: Counter B (multiplier), ld > dec ───────────────────
+module CNTR (dout, din, ld, dec, clk);
+    input [15:0] din;  input ld, dec, clk;
+    output reg [15:0] dout;
+    always @(posedge clk)
+        if      (ld)  dout <= din;
+        else if (dec) dout <= dout - 1;
+endmodule
+
+// ── ADD: Combinational adder ──────────────────────────────────
+module ADD (z, x, y);
+    input  [15:0] x, y;  output [15:0] z;
+    assign z = x + y;
+endmodule
+
+// ── EQZ: Zero detector ───────────────────────────────────────
+module EQZ (eqz, x);
+    input  [15:0] x;  output eqz;
+    assign eqz = (x == 16'b0);
+endmodule
