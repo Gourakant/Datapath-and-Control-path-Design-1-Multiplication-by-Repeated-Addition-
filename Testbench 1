@@ -1,0 +1,42 @@
+module MUL_test;
+    reg        clk, start;
+    reg [15:0] data_in;
+    wire       done;
+    wire       eqz, ldA, ldB, ldP, clrP, decB;
+
+    MUL_datapath DP (eqz, ldA, ldB, ldP, clrP, decB, data_in, clk);
+    controller   C  (ldA, ldB, ldP, clrP, decB, done, clk, eqz, start);
+
+    // Clock: 10 ns period, posedges at t=5, 15, 25, 35 ...
+    initial clk = 1'b0;
+    always  #5 clk = ~clk;
+
+    initial begin
+        // FIX: initialise data_in so it is never x
+        data_in = 16'd0;
+        start   = 1'b0;
+
+        // Multiplicand (A) must be stable before the t=15 posedge (S0→S1, ldA fires)
+        // Present it at t=2 — well before t=15
+        #2  data_in = 16'd17;   // A = 17
+            start   = 1'b1;     // controller sees start=1 at t=5 posedge → enters S1
+
+        // De-assert start cleanly after one clock period
+        #10 start = 1'b0;
+
+        // Multiplier (B) must be stable before the t=25 posedge (S1→S2, ldB fires)
+        // S2 is reached at t=25; present B at t=20
+        #8  data_in = 16'd5;    // B = 5   (at t=20, before t=25 posedge)
+
+        // Wait long enough for B*A iterations (B=5 → ~5 decrement cycles)
+        // Each multiply loop iteration takes one clock, plus 2 setup clocks
+        // Total ≈ (5+3) × 10 ns = 80 ns; finish at 200 ns for safety
+        #500 $finish;
+    end
+
+    initial begin
+        $monitor("%0t  Pout=%0d  done=%b", $time, DP.Pout, done);
+        $dumpfile("MUL.vcd");
+        $dumpvars(0, MUL_test);
+    end
+endmodule
